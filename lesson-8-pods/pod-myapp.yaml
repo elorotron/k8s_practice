@@ -20,7 +20,7 @@ spec:
       - containerPort: 80
 
   - name: apache
-    image: httpd:latest
+    image: tomcat:latest
     resources:
       limits:
         memory: "256Mi"
