@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: my_web
+  name: susel-web-pod
   labels:
     env: prod
     app: main
