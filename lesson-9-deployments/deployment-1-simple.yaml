@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: susel-web
-        image: nginx:lates
+        image: nginx:latest
         resources:
           limits:
             memory: "128Mi"
