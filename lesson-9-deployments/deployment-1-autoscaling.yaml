@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+#===================DEPLOYMENT===================
+kind: Deployment
+metadata:
+  name: my-web-deployment-autoscaling #name for deployment
+  labels:
+    app: my-k8-app
+    env: prod
+    owner: DenisAnanev
+#==========spec==================================
+spec:
+  replicas: 2
+  selector: #which pods this deployment would work
+    matchLabels:
+      project: mossad #required to match with that labels which you want to attach deployment
+#==================POD========================
+  template:
+    metadata:
+      labels:
+        project: mossad #label for pod, required to match with label in spec
+    spec:
+      containers:
+      - name: mossad-web #name for pod
+        image: nginx:latest #image
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 8080
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-autoscaling #name for horizontal autoscaler pod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-web-deployment-autoscaling #same name of deployment
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
