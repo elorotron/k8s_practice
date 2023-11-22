@@ -33,9 +33,9 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: my-autoscaling #name for horizontal autoscaler pod
+  name: my-autoscaling #name for HorizontalPodAutoscaler
 spec:
-  scaleTargetRef:
+  scaleTargetRef: #attach autoscaling to deployment
     apiVersion: apps/v1
     kind: Deployment
     name: my-web-deployment-autoscaling #same name of deployment
