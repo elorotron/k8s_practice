@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+#===================DEPLOYMENT===================
+kind: Deployment
+metadata:
+  name: my-web-deployment #name for deployment
+  labels:
+    app: my-k8-app
+#==========spec==================================
+spec:
+  selector: #which pods this deployment would work
+    matchLabels:
+      project: susel
+#==================POD========================
+  template:
+    metadata:
+      labels:
+        project: susel
+    spec:
+      containers:
+      - name: susel-web
+        image: nginx:lates
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 80
