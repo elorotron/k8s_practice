@@ -9,8 +9,8 @@ spec:
   - host: www.susel-ddns.net
     http:
       paths:
-      # - pathType: Prefix
-      #   path: "/"
+      - pathType: Prefix
+        path: "/"
       - backend:
           service:
             name: main
@@ -20,6 +20,8 @@ spec:
   - host: web1.susel-ddns.net
     http:
       paths:
+      - pathType: Prefix
+        path: "/"
       - backend:
           service:
             name: web1
@@ -29,6 +31,8 @@ spec:
   - host: web2.susel-ddns.net
     http:
       paths:
+      - pathType: Prefix
+        path: "/"
       - backend:
           service:
             name: web2
@@ -38,6 +42,8 @@ spec:
   - host: webx.susel-ddns.net
     http:
       paths:
+      - pathType: Prefix
+        path: "/"
       - backend:
           service:
             name: webx
@@ -47,6 +53,8 @@ spec:
   - host: cat.susel-ddns.net
     http:
       paths:
+      - pathType: Prefix
+        path: "/"
       - backend:
           service:
             name: tomcat
