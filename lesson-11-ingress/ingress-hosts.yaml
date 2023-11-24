@@ -1,0 +1,55 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-hosts
+  labels:
+    name: myingress
+spec:
+  rules:
+  - host: www.susel-ddns.net
+    http:
+      paths:
+      # - pathType: Prefix
+      #   path: "/"
+      - backend:
+          service:
+            name: main
+            port: 
+              number: 80
+  
+  - host: web1.susel-ddns.net
+    http:
+      paths:
+      - backend:
+          service:
+            name: web1
+            port: 
+              number: 80
+  
+  - host: web2.susel-ddns.net
+    http:
+      paths:
+      - backend:
+          service:
+            name: web2
+            port: 
+              number: 80
+
+  - host: webx.susel-ddns.net
+    http:
+      paths:
+      - backend:
+          service:
+            name: webx
+            port: 
+              number: 80
+
+  - host: cat.susel-ddns.net
+    http:
+      paths:
+      - backend:
+          service:
+            name: tomcat
+            port: 
+              number: 8080
+  
