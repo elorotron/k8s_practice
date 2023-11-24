@@ -10,7 +10,7 @@ spec:
     http:
       paths:
       - pathType: Prefix
-        path: "/"
+        path: /
       - backend:
           service:
             name: main
@@ -21,7 +21,7 @@ spec:
     http:
       paths:
       - pathType: Prefix
-        path: "/"
+        path: /
       - backend:
           service:
             name: web1
@@ -32,7 +32,7 @@ spec:
     http:
       paths:
       - pathType: Prefix
-        path: "/"
+        path: /
       - backend:
           service:
             name: web2
@@ -43,7 +43,7 @@ spec:
     http:
       paths:
       - pathType: Prefix
-        path: "/"
+        path: /
       - backend:
           service:
             name: webx
@@ -54,7 +54,7 @@ spec:
     http:
       paths:
       - pathType: Prefix
-        path: "/"
+        path: /
       - backend:
           service:
             name: tomcat
