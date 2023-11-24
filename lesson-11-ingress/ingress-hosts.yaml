@@ -54,21 +54,21 @@ spec:
     http:
       paths:
       - pathType: Prefix
-        path: "/susel-ddns"
+        path: /
         backend:
           service:
             name: tomcat
             port: 
               number: 8080
 
-  # - host: cat.susel-ddns.net
-  #   http:
-  #     paths:
-  #     - backend:
-  #         service:
-  #           name: tomcat
-  #           port:
-  #             number: 8080
-  #       path: /
-  #       pathType: ImplementationSpecific
+  - host: cat.susel-ddns.net
+    http:
+      paths:
+      - backend:
+          service:
+            name: tomcat
+            port:
+              number: 8080
+        path: /
+        pathType: ImplementationSpecific
   
