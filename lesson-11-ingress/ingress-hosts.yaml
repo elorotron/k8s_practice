@@ -9,46 +9,46 @@ spec:
   - host: www.susel-ddns.net
     http:
       paths:
-      - backend:
+      - pathType: Prefix
+        path: /
+        backend:
           service:
             name: main
             port: 
               number: 80
-        pathType: ImplementationSpecific
-        path: /
   
   - host: web1.susel-ddns.net
     http:
       paths:
-      - backend:
+      - pathType: Prefix
+        path: /
+        backend:
           service:
             name: web1
             port: 
               number: 80
-        path: /
-        pathType: ImplementationSpecific
   
   - host: web2.susel-ddns.net
     http:
       paths:
-      - backend:
+      - pathType: Prefix
+        path: /
+        backend:
           service:
             name: web2
             port: 
               number: 80
-        path: /
-        pathType: ImplementationSpecific
 
   - host: webx.susel-ddns.net
     http:
       paths:
-      - backend:
+      - pathType: Prefix
+        path: /
+        backend:
           service:
             name: webx
             port: 
               number: 80
-        path: /
-        pathType: ImplementationSpecific
 
   - host: cat.susel-ddns.net
     http:
