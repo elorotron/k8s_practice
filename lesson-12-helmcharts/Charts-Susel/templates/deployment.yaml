@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: {{ .Release.Name }}-web
-        image: {{ .Valuse.container.image }}
+        image: {{ .Values.container.image }}
         resources:
           limits:
             memory: "128Mi"
