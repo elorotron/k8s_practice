@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-service
+  labels:
+    env: prod
+    owner: DenisAnanev
+spec:
+  selector:
+    project: {{ .Release.Name }}-susel # Selecting PODS with those Labels
+  ports:
+    - name: {{ .Release.Name }}-listener
+      protocol: TCP
+      port: 80 #Port on LoadBalancer
+      targetPort: 80 #Port on POD
+  type: LoadBalancer
+  

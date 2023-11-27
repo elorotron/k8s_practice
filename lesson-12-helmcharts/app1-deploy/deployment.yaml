@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-web1-deployment
+  labels:
+    app: my-k8s1-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      project: susel1
+  template:
+    metadata:
+      labels:
+        project: susel1 #service look for this label
+    spec:
+      containers:
+      - name: susel1-web
+        image: adv4000/k8sphp:version1
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 80

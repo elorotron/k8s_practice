@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-deployment
+  labels:
+    app: {{ .Release.Name }}-deployment
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      project: {{ .Release.Name }}-susel
+  template:
+    metadata:
+      labels:
+        project: {{ .Release.Name }}-susel #service look for this label
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-web
+        image: {{ .Valuse.container.image }}
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 80
