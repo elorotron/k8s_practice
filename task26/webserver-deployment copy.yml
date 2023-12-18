@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-web-deployment #name for deployment
+  labels:
+    app: my-k8s-deployment #label for deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      project: susel #all pods that have this label are connecting to the deployment
+#=============PODS==============================================================================
+  template:
+    metadata:
+      labels:
+        project: susel #Service will look for those PODS Labels
+    spec:
+      containers:
+      - name: susel-nginx #name for pods
+        image: nginx:latest
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 80
+
+      - name: susel-apache #name for pods
+        image: tomcat:latest
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 8080
+
+---
+#==============SERVICE=====================
+apiVersion: v1
+kind: Service
+metadata:
+  name: susel-nginx-apache-service
+  labels:
+    env: prod
+    owner: DenisAnanev
+spec:
+  selector:
+    project: susel # Selecting PODS with those Labels
+  ports:
+    - name: web-listener
+      protocol: TCP
+      port: 80 #Port on LoadBalancer
+      targetPort: 80 #Port on POD
+  type: LoadBalancer
+

@@ -1,29 +1,16 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: susel-web-pod
+  name: nginx
   labels:
-    env: prod
-    app: main
-    tier: frontend
-    owner: DenisAnanev
+    name: webserver
 spec:
   containers:
-
   - name: nginx
     image: nginx:latest
     resources:
       limits:
-        memory: "256Mi"
+        memory: "128Mi"
         cpu: "500m"
     ports:
       - containerPort: 80
-
-  - name: tomcat
-    image: tomcat:latest
-    resources:
-      limits:
-        memory: "256Mi"
-        cpu: "500m"
-    ports:
-      - containerPort: 8080

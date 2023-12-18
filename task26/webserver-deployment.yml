@@ -1,0 +1,397 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-web-deployment #name for deployment
+  labels:
+    app: my-k8s-deployment #label for deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      project: susel #all pods that have this label are connecting to the deployment
+  template:
+    metadata:
+      labels:
+        project: susel #Service will look for those PODS Labels
+    spec:
+      containers:
+      - name: susel-nginx #name for pods
+        image: suselstar/nginx:1.0
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - name: nginx-config
+            mountPath: /etc/nginx/conf.d/default.conf
+            subPath: default.conf
+          - name: nginx-config
+            mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+          - name: ssl-certs
+            mountPath: /etc/ssl/certs
+          - name: html
+            mountPath: /var/www/html
+
+      - name: susel-apache #name for pods
+        image: suselstar/apache:1.0
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 8080
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-config-map
+        - name: ssl-certs
+          secret:
+            secretName: nginx-ssl-secret
+        - name: html
+          configMap:
+            name: nginx-html-config
+---
+#==============SERVICE=====================
+apiVersion: v1
+kind: Service
+metadata:
+  name: susel-nginx-apache-service
+  labels:
+    env: prod
+    owner: DenisAnanev
+spec:
+  selector:
+    project: susel # Selecting PODS with those Labels
+  ports:
+    - name: web-listener
+      protocol: TCP
+      port: 80 #Port on LoadBalancer
+      targetPort: 80 #Port on POD
+  type: LoadBalancer
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config-map
+data:
+  default.conf: |
+    log_format upstreamlog '$server_name to: $upstream_addr [$request] '
+      'upstream_response_time $upstream_response_time '
+      'msec $msec request_time $request_time';
+
+
+    upstream notes {
+    server localhost:8081;
+    server localhost:8085;
+    }
+
+    #load_module modules/ngx_http_image_filter_module.so;
+    #=========================================================
+    server {
+        server_name susel.ddns.net;
+        access_log /var/log/nginx/access.log upstreamlog;
+
+        location / {
+            proxy_pass http://notes;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /secondpage/ {
+            proxy_pass http://notes;
+        }
+
+        location /music {
+            proxy_pass http://notes;
+        }
+
+
+        #location /info.php {
+        #    proxy_pass http://apache:8090/;
+
+        #}
+
+    #---------Regular expression-----------
+
+        location ~ ^/file/.*\.(jpg|png)$ {
+      proxy_pass http://notes;
+        }
+
+    #-------------------------------------
+        #YAML FILE
+        location /files/ansible.yaml {
+            proxy_pass http://notes;
+        }
+
+    #----------------CPU usage-------------
+
+        location /stat {
+            proxy_pass http://notes;
+      #add_header Refresh "5";
+        }
+
+    #-----------Errors-----------------
+
+        location /error {
+      proxy_pass http://notes;
+      
+        }
+
+    #==============SSL and redirect=========================================================================
+
+        listen 443 ssl;
+        ssl_certificate /etc/ssl/certs/fullchain1.pem;
+        ssl_certificate_key /etc/ssl/certs/privkey1.pem;
+
+    }
+
+
+
+
+    server {
+        if ($host = susel.ddns.net) {
+            return 301 https://$host$request_uri;
+        }
+
+
+        listen 80;
+        server_name susel.ddns.net;
+        return 404;
+
+
+    }
+
+    #===================================================================================
+
+    server {
+
+    #================================
+        server_name localhost;
+        
+        listen [::]:8081;
+        listen 8081;
+        
+        root /var/www/html;
+        index index.html index.php info.php;
+        
+    #=======Location block==================
+
+        location / {
+            try_files $uri $uri/ =404;
+        }
+
+        location /secondpage/ {
+            alias /var/www/html/secondpage/;
+            index index.html;
+            try_files $uri $uri/ =404;
+        }
+
+        location /music {
+            alias /var/www/html/music;
+            add_header Content-Disposition 'attachment; filename="carry_on_wayward_son.mp3"';
+        }
+
+    #--------------=Regular expressoin-------------
+
+        location ~* ^/files/(.*\.png)$ {
+            root /var/www/html;
+      types {
+        image/png png;
+      }
+        }
+
+    #----------regex with rotate-------------------
+
+        location ~* ^/files/(.*\.jpg)$ {
+            root /var/www/html/;
+            image_filter rotate 180;
+            types {
+              image/jpeg jpg;
+            }
+        }
+
+    #----------------------------------------------
+
+        location /files/ansible.yaml {
+            alias /var/www/html/files/ansible.yaml;
+            default_type text/plain;
+        }
+
+
+    #-----------------cpu stat--------------------
+
+
+        location /stat {
+            alias /var/www/html/stat/;
+            index cpu.html;
+            try_files $uri $uri/ =404;
+      add_header Refresh "5";
+        }
+
+    #----------errors------------------------------
+
+        location /error {
+              return 500 "Error test";
+            }
+
+
+
+    }
+    #===================================================
+
+    server {
+
+    #================================
+        server_name localhost;
+        
+        listen [::]:8085;
+        listen 8085;
+        
+        root /var/www/html;
+        index index2.html index.php info.php;
+        
+    #=======Location block==================
+
+        location / {
+            try_files $uri $uri/ =404;
+        }
+
+        location /secondpage/ {
+            alias /var/www/html/secondpage/;
+            index index.html;
+            try_files $uri $uri/ =404;
+        }
+
+        location /music {
+            alias /var/www/html/music;
+            add_header Content-Disposition 'attachment; filename="carry_on_wayward_son.mp3"';
+        }
+
+    #--------------=Regular expressoin-------------
+
+        location ~* ^/files/(.*\.png)$ {
+            root /var/www/html;
+      types {
+        image/png png;
+      }
+        }
+
+    #----------regex with rotate-------------------
+
+        location ~* ^/files/(.*\.jpg)$ {
+            root /var/www/html/;
+            image_filter rotate 180;
+            types {
+              image/jpeg jpg;
+            }
+        }
+
+    #----------------------------------------------
+
+        location /files/ansible.yaml {
+            alias /var/www/html/files/ansible.yaml;
+            default_type text/plain;
+        }
+
+    #----------CPU USAGE-----------------------
+
+        location /stat {
+            alias /var/www/html/stat/;
+            index cpu.html;
+            try_files $uri $uri/ =404;
+      add_header Refresh "5";
+        }
+
+    #--------------errors--------------
+
+        location /error {
+              return 500 "Error test";
+            }
+
+
+
+    }
+
+  nginx.conf: |
+    user  nginx;
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log notice;
+    pid        /var/run/nginx.pid;
+
+    load_module modules/ngx_http_image_filter_module.so;
+    events {
+        worker_connections  1024;
+    }
+
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+
+        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log  /var/log/nginx/access.log  main;
+
+        sendfile        on;
+        #tcp_nopush     on;
+
+        keepalive_timeout  65;
+
+
+        #gzip  on;
+
+
+        include /etc/nginx/conf.d/*.conf;
+    }
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nginx-ssl-secret
+type: Opaque
+data:
+  fullchain1.pem: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUU2RENDQTlDZ0F3SUJBZ0lTQkZjWnh6cWhSSWU5d1hSR3BVWGZKNVc5TUEwR0NTcUdTSWIzRFFFQkN3VUEKTURJeEN6QUpCZ05WQkFZVEFsVlRNUll3RkFZRFZRUUtFdzFNWlhRbmN5QkZibU55ZVhCME1Rc3dDUVlEVlFRRApFd0pTTXpBZUZ3MHlNekV4TURVeE5EVTFORGxhRncweU5EQXlNRE14TkRVMU5EaGFNQmt4RnpBVkJnTlZCQU1UCkRuTjFjMlZzTG1Sa2JuTXVibVYwTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUEKbk1zbjc5d0dZUWRldmVhelZaMVB5em91eTJGNE41ekdHemFvQUZKZENWWURObUhwVCsyclhkRzYrL0xUdHN5WgpYK2lqRHVaQ3JEeTQ4ZC9XOHZBNjNXYnBvRURPaHZ2OUlPRDc4bE0xOFAwcnN3ZllaSkIwOVZoUjBIK3orZjZTCmdaUGdOYVVwczd1YzNyYnFkc0tBWmpuWDgzZ1FUT0VZYnhGZTBWakFydjhYSGRSL2hJUjlkRW1HMXkrRXlMU2gKdDNOdEhMcHFLSmdXeE1tYTdkTkpWK2dadGhoS2J6VjFsSUlSY0xiYkRZLy9vUjhLWFNJT3FvbXovRjRKbjJGUApPd0F5KzBmeVRhVWhYZ3NRbUNMTU1DMW5nalV5ZmE1d3UyOVFocURuTS9oaGtTMDhrd1k1S1VwdlQ0dnYyZE9rCnBFK1BHSjhRRU9qMzBtN3p4TTVtMndJREFRQUJvNElDRHpDQ0Fnc3dEZ1lEVlIwUEFRSC9CQVFEQWdXZ01CMEcKQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBTUJnTlZIUk1CQWY4RUFqQUFNQjBHQTFVZApEZ1FXQkJTbmlyYjd1NUY4UEhFUkdNbyt1SnVVQnJhdzlqQWZCZ05WSFNNRUdEQVdnQlFVTHJNWHQxaFd5NjVRCkNVRG1INitkaXhUQ3hqQlZCZ2dyQmdFRkJRY0JBUVJKTUVjd0lRWUlLd1lCQlFVSE1BR0dGV2gwZEhBNkx5OXkKTXk1dkxteGxibU55TG05eVp6QWlCZ2dyQmdFRkJRY3dBb1lXYUhSMGNEb3ZMM0l6TG1rdWJHVnVZM0l1YjNKbgpMekFaQmdOVkhSRUVFakFRZ2c1emRYTmxiQzVrWkc1ekxtNWxkREFUQmdOVkhTQUVEREFLTUFnR0JtZUJEQUVDCkFUQ0NBUU1HQ2lzR0FRUUIxbmtDQkFJRWdmUUVnZkVBN3dCMkFFaXc0MnZhcGtjMEQrVnFBdnFkTU9zY1VnSEwKVnQwc2dkbTd2NnM1MklSekFBQUJpNkF5amRRQUFBUURBRWN3UlFJZ1liMEQ0NHhSb1F2SWVOYS82YXZRaVQ5UwprUEhYM0JUTlV6NUgvSFIxanJFQ0lRQ2VpdGJ2cXhuendRL2tHRVFWL25MVVRyMWx2dndNeFNOb1lQR0dxUHR0CmpRQjFBRHRUZDNVK0xibUFUb3N3V3diK1FEdG4yRS9EOU1lOUFBMHRjbS9oK3RRWEFBQUJpNkF5amVZQUFBUUQKQUVZd1JBSWdFUEt1L1gzalVzMjJ2eXB3d2I1QnovcmVOWGlYdEl3YUt0ZFE2RnhSK0NJQ0lFeCtydktkcEVHdgorTW1FREtNTUpId3hiMjVtR3A1L3VDRktCMkFhZGNKYk1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQmJDbG1XCmJHbDdoNS9XdktMRG5VdEtRUENSM1laR3R1cDEwa2dORXZZR3VOWW94WHMwUCtBbnEyL1BuNUE1Z1NPSzB2UUQKL3dQanZoVjBHRGVVUFBnLzJaRWIwbUk0UCsyY3I5Z3FCZXU0VmRqMkRyNU5KMFFVSFJsOHhicEs3dGVQcGR4VgordEFMd29mbXM1WVdCYno2OGIxcGVjMkxFekVHSUVKaDV0cVNmSlJsOTc4cHBrbjFDRDNONWhnSXFZY0xQL1g0CmtxbEtUMFI4SCtsc042bUtIbms4cGxJZFdWQUtHQzJqbG9YYzJGQ1F4VGdZUEI0bVpBdEMxcTlRNDJzUXFnSUsKSFF2alZGa3ZsSGhad0hIZ2RiTi9qK095TFQvMDBKenlyb1ArTEliS2NIVTZlM1E5TjdCQ2l4bjRTSXIyR1J5SQpaSHhMUW9vQVVVb2ljZVNTCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0KLS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZGakNDQXY2Z0F3SUJBZ0lSQUpFckNFclBEQmluVS9iV0xpV25YMW93RFFZSktvWklodmNOQVFFTEJRQXcKVHpFTE1Ba0dBMVVFQmhNQ1ZWTXhLVEFuQmdOVkJBb1RJRWx1ZEdWeWJtVjBJRk5sWTNWeWFYUjVJRkpsYzJWaApjbU5vSUVkeWIzVndNUlV3RXdZRFZRUURFd3hKVTFKSElGSnZiM1FnV0RFd0hoY05NakF3T1RBME1EQXdNREF3CldoY05NalV3T1RFMU1UWXdNREF3V2pBeU1Rc3dDUVlEVlFRR0V3SlZVekVXTUJRR0ExVUVDaE1OVEdWMEozTWcKUlc1amNubHdkREVMTUFrR0ExVUVBeE1DVWpNd2dnRWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUJEd0F3Z2dFSwpBb0lCQVFDN0FoVW96UGFnbE5NUEV1eU5WWkxEK0lMeG1hWjZRb2luWFNhcXRTdTV4VXl4cjQ1citYWElvOWNQClI1UVVWVFZYako2b29qa1o5WUk4UXFsT2J2VTd3eTdiamNDd1hQTlpPT2Z0ejJud1dnc2J2c0NVSkNXSCtqZHgKc3hQbkhLemhtKy9iNUR0RlVrV1dxY0ZUempUSVV1NjFydTJQM21CdzRxVlVxN1p0RHBlbFFEUnJLOU84WnV0bQpOSHo2YTR1UFZ5bVorREFYWGJweWIvdUJ4YTNTaGxnOUY4Zm5DYnZ4Sy9lRzNNSGFjVjNVUnVQTXJTWEJpTHhnClozVm1zL0VZOTZKYzVsUC9Pb2kyUjZYL0V4anFtQWwzUDUxVCtjOEI1ZldtY0JjVXIyT2svNW16azUzY1U2Y0cKL2tpRkhhRnByaVYxdXhQTVVnUDE3VkdoaTlzVkFnTUJBQUdqZ2dFSU1JSUJCREFPQmdOVkhROEJBZjhFQkFNQwpBWVl3SFFZRFZSMGxCQll3RkFZSUt3WUJCUVVIQXdJR0NDc0dBUVVGQndNQk1CSUdBMVVkRXdFQi93UUlNQVlCCkFmOENBUUF3SFFZRFZSME9CQllFRkJRdXN4ZTNXRmJMcmxBSlFPWWZyNTJMRk1MR01COEdBMVVkSXdRWU1CYUEKRkhtMFdlWjd0dVhrQVhPQUNJaklHbGoyNlp0dU1ESUdDQ3NHQVFVRkJ3RUJCQ1l3SkRBaUJnZ3JCZ0VGQlFjdwpBb1lXYUhSMGNEb3ZMM2d4TG1rdWJHVnVZM0l1YjNKbkx6QW5CZ05WSFI4RUlEQWVNQnlnR3FBWWhoWm9kSFJ3Ck9pOHZlREV1WXk1c1pXNWpjaTV2Y21jdk1DSUdBMVVkSUFRYk1Ca3dDQVlHWjRFTUFRSUJNQTBHQ3lzR0FRUUIKZ3Q4VEFRRUJNQTBHQ1NxR1NJYjNEUUVCQ3dVQUE0SUNBUUNGeWs1SFBxUDNoVVNGdk5WbmVMS1lZNjExVFI2VwpQVE5sY2xRdGdhRHF3KzM0SUw5ZnpMZHdBTGR1Ty9aZWxON2tJSittNzR1eUErZWl0Ulk4a2M2MDdUa0M1M3dsCmlrZm1aVzQvUnZUWjhNNlVLKzVVemhLOGpDZEx1TUdZTDZLdnpYR1JTZ2kzeUxnamV3UXRDUGtJVno2RDJRUXoKQ2tjaGVBbUNKOE1xeUp1NXpsenlaTWpBdm5uQVQ0NXRSQXhla3JzdTk0c1E0ZWdkUkNuYldTRHRZN2toK0JJbQpsSk5Yb0IxbEJNRUtJcTRRRFVPWG9SZ2ZmdURnaGplMVdyRzlNTCtIYmlzcS95Rk9Hd1hEOVJpWDhGNnN3Nlc0CmF2QXV2RHN6dWU1TDNzejg1SytFQzRZL3dGVkROdlpvNFRZWGFvNlowZitsUUtjMHQ4RFFZemsxT1hWdThycDIKeUpNQzZhbExiQmZPREFMWnZZSDduN2RvMUFabHM0STlkMVA0am5rRHJRb3hCM1VxUTloVmwzTEVLUTczeEYxTwp5SzVHaEREWDhvVmZHS0Y1dStkZWNJc0g0WWFUdzdtUDNHRnhKU3F2MyswbFVGSm9pNUxjNWRhMTQ5cDkwSWRzCmhDRXhyb0wxKzdtcnlJa1hQZUZNNVRnTzlyMHJ2WmFCRk92VjJ6MGdwMzVaMCtMNFdQbGJ1RWpOL2x4UEZpbisKSGxVanI4Z1JzSTNxZkpPUUZ5LzlyS0lKUjBZLzhPbXd0LzhvVFdneTFtZGVIbW1qazdqMW5Zc3ZDOUpTUTZadgpNbGRsVFRLQjN6aFRoVjErWFdZcDZyamQ1SlcxemJWV0VrTE54RTdHSlRoRVVHM3N6Z0JWR1A3cFNXVFVUc3FYCm5MUmJ3SE9vcTdoSHdnPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQotLS0tLUJFR0lOIENFUlRJRklDQVRFLS0tLS0KTUlJRllEQ0NCRWlnQXdJQkFnSVFRQUYzSVRmVTZVSzQ3bmFxUEdRS3R6QU5CZ2txaGtpRzl3MEJBUXNGQURBLwpNU1F3SWdZRFZRUUtFeHRFYVdkcGRHRnNJRk5wWjI1aGRIVnlaU0JVY25WemRDQkRieTR4RnpBVkJnTlZCQU1UCkRrUlRWQ0JTYjI5MElFTkJJRmd6TUI0WERUSXhNREV5TURFNU1UUXdNMW9YRFRJME1Ea3pNREU0TVRRd00xb3cKVHpFTE1Ba0dBMVVFQmhNQ1ZWTXhLVEFuQmdOVkJBb1RJRWx1ZEdWeWJtVjBJRk5sWTNWeWFYUjVJRkpsYzJWaApjbU5vSUVkeWIzVndNUlV3RXdZRFZRUURFd3hKVTFKSElGSnZiM1FnV0RFd2dnSWlNQTBHQ1NxR1NJYjNEUUVCCkFRVUFBNElDRHdBd2dnSUtBb0lDQVFDdDZDUno5QlEzODV1ZUsxY29ISWUrM0xmZk9KQ01ianptVjZCNDkzWEMKb3Y3MWFtNzJBRThvMjk1b2hteEVrN2F4WS8wVUVtdS9IOUxxTVpzaGZ0RXpQTHBJOWQxNTM3TzQveEx4SVpwTAp3WXFHY1dsS1ptWnNqMzQ4Y0wrdEtTSUc4K1RBNW9DdTRrdVB0NWwrbEFPZjAwZVhmSmxJSTFQb09LNVBDbStECkx0RkpWNHlBZExiYUw5QTRqWHNEY0NFYmRmSXdQUHFQcnQzYVk2dnJGay9DamhGTGZzOEw2UCsxZHk3MHNudEsKNEV3U0pReHdqUU1wb09GVEpPd1QyZTRadnhDelNvdy9pYU5oVWQ2c2h3ZVU5R054N0M3aWIxdVlnZUdKWERSNQpiSGJ2TzVCaWVlYmJwSm92SnNYUUVPRU8zdGtRamhiN3QvZW85OGZsQWdlWWp6WUlsZWZpTjVZTk5uV2UrdzV5CnNSMmJ2QVA1U1FYWWdkMEZ0Q3JXUWVtc0FYYVZDZy9ZMzlXOUVoODFMeWdYYk5LWXdhZ0paSGR1UnplNnpxeFoKWG1pZGYzTFdpY1VHUVNrK1dUN2RKdlVreVJHbldxTk1RQjlHb1ptMXB6cFJib1k3bm4xeXB4SUZlRm50UGxGNApGUXNEajQzUUx3V3lQbnRLSEV0ekJSTDh4dXJnVUJOOFE1TjBzOHAwNTQ0ZkFRalFNTlJiY1RhMEI3ckJNREJjClNMZUNPNWltZldDS29xTXBnc3k2dllNRUc2S0RBMEdoMWdYeEc4SzI4S2g4aGp0R3FFZ3FpTngybW5hL0gycWwKUFJtUDZ6anpaTjdJS3cwS0tQLzMyK0lWUXRRaTBDZGQ0WG4rR09kd2lLMU81dG1MT3NiZEoxRnUvN3hrOVRORApUd0lEQVFBQm80SUJSakNDQVVJd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBT0JnTlZIUThCQWY4RUJBTUNBUVl3ClN3WUlLd1lCQlFVSEFRRUVQekE5TURzR0NDc0dBUVVGQnpBQ2hpOW9kSFJ3T2k4dllYQndjeTVwWkdWdWRISjEKYzNRdVkyOXRMM0p2YjNSekwyUnpkSEp2YjNSallYZ3pMbkEzWXpBZkJnTlZIU01FR0RBV2dCVEVwN0drZXl4eAordHZoUzVCMS84UVZZSVdKRURCVUJnTlZIU0FFVFRCTE1BZ0dCbWVCREFFQ0FUQS9CZ3NyQmdFRUFZTGZFd0VCCkFUQXdNQzRHQ0NzR0FRVUZCd0lCRmlKb2RIUndPaTh2WTNCekxuSnZiM1F0ZURFdWJHVjBjMlZ1WTNKNWNIUXUKYjNKbk1Ed0dBMVVkSHdRMU1ETXdNYUF2b0MyR0syaDBkSEE2THk5amNtd3VhV1JsYm5SeWRYTjBMbU52YlM5RQpVMVJTVDA5VVEwRllNME5TVEM1amNtd3dIUVlEVlIwT0JCWUVGSG0wV2VaN3R1WGtBWE9BQ0lqSUdsajI2WnR1Ck1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQUtjd0JzbG03L0RsTFFydDJNNTFvR3JTK280NCsveVFvREZWREMKNVd4Q3UyK2I5TFJQd2tTSUNIWE02d2ViRkdKdWVON3NKN281WFBXaW9XNVdsSEFRVTdHNzVLL1Fvc01yQWRTVwo5TVVnTlRQNTJHRTI0SEdOdExpMXFvSkZsY0R5cVNNbzU5YWh5MmNJMnFCRExLb2JreC9KM3ZXcmFWMFQ5VnVHCldDTEtUVlhrY0dkdHdsZkZSamxCejRwWWcxaHRtZjVYNkRZTzhBNGpxdjJJbDlEalhBNlVTYlcxRnpYU0xyOU8KaGU4WTRJV1M2d1k3YkNrakNXRGNSUUpNRWhnNzZmc08zdHhFK0ZpWXJ1cTlSVVdoaUYxbXl2NFE2VytDeUJGQwpEZnZwN09PR0FONmRFT000K3FSOXNkam9TWUtFQnBzcjZHdFBBUXc0ZHk3NTNlYzUKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  privkey1.pem: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUV1d0lCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktVd2dnU2hBZ0VBQW9JQkFRQ2N5eWZ2M0FaaEIxNjkKNXJOVm5VL0xPaTdMWVhnM25NWWJOcWdBVWwwSlZnTTJZZWxQN2F0ZDBicjc4dE8yekpsZjZLTU81a0tzUExqeAozOWJ5OERyZFp1bWdRTTZHKy8wZzRQdnlVelh3L1N1ekI5aGtrSFQxV0ZIUWY3UDUvcEtCaytBMXBTbXp1NXplCnR1cDJ3b0JtT2RmemVCQk00Umh2RVY3UldNQ3UveGNkMUgrRWhIMTBTWWJYTDRUSXRLRzNjMjBjdW1vb21CYkUKeVpydDAwbFg2Qm0yR0Vwdk5YV1VnaEZ3dHRzTmovK2hId3BkSWc2cWliUDhYZ21mWVU4N0FETDdSL0pOcFNGZQpDeENZSXN3d0xXZUNOVEo5cm5DN2IxQ0dvT2N6K0dHUkxUeVRCamtwU205UGkrL1owNlNrVDQ4WW54QVE2UGZTCmJ2UEV6bWJiQWdNQkFBRUNnZjhrY1JOWExFeFBRT2RFTzlweWk1MkFIb1hCdjJXeGh6NkVGSy8zWXkwOGZrRkEKNG9EWGt1WEJhSDJORVdNam1Xb01ZSVdGY1A4T0NRN3pLSk5NNDRqSzdLQmdIcS9ocjYrbGRLVWFMVHpjUmZ0aQpJUENxYnVqQUhVYm1yc2VsMHdVNkdLU0QwMTlkNXIwUEJuUjRKYnl5QmIrclZyeHpJZDRMOG4yWEtvbWVJazUvCjhmUDh2Q1NldjFJa0NWN3pHeUJ1ODdRUTZsaW1QazlKNjkzYlFjcGIrd3Jrby9zL3E5ZEo0MjNncWkyRnNjTysKMi83UDYrVXFpMTFCdkdYT1I5RktUcElQbFJwVXdrNVVOVlordWlpc2l6SzVaakhlcmppRXhBSFh1K0FlaXNhdgo5aEd3VEl1Y2R6L2p4STZpZFVlZWMwV3N5Nm1xYmZKWi9jUkIyZmtDZ1lFQTBrTXk3cDMvanYxWVQ2endXNHA5CkRKYitxb2xIOHAzcE03amxJaTJnd2dTUTI5MzI0Tk0xaHlZdzA3ZmRqY2pRL3E1Um5pQVJGQzlPYW90Y2dtT1YKT2xKcDZjRHRXQ1A5NVEyVm1zREJGWGw4Z0libXptZWtVam1lOUtQVFFlWGtyZWZTWmlCVEJndnhKdGpleEpPVwpESGhMcjhQMWR0eDdTZXcvUHVZVDlja0NnWUVBdnVaMGw2VXNLMUxYcDRNUHlIN2F2L3VMMWR3VU1FVjArcEp0CmU5dWh3dzk4UER4enN6cUpPZVhORTdRa1c0WFZidXZRc0ZjOVF6OUJuQXQzTHRvNVErNkJYMDgxVTRzTjZBbG4KMWNYa1IwWDBKRGNmYVdIZXREMElMajVGTFhkT1BGcmphajE4YVVoVGJhZ1VxSGVuWCtoV0ZybDYrQWJhNk96bwpOT0JmR1lNQ2dZQWI4T3dpdzRKRGVTMDBJVklyaUFMSUdvU3JHdVVodTVSUzJENHl4WWQ0WU96ekd0TUUyMnhnCmtsV292T1ZIUXlscXZyVi80dGtDS3Fzc0Eycit0TWNPNGdiTEZtVXo4a3g2Rk0wTnJKRzhEZEhhcnBLYldUQi8KOE1KTDFqMXJvMlk1S2ZaT3RmcnljY0hSSEw2MXRyc1kyeCtMc3VtNnF1QURXYzZweUI5YzZRS0JnQXpWaFlVawpiNkhDQWdtYkFCYWtvS1JEanhVanBKL1NLNWtrK3dOV3NydGdjU1BEbEt1NkJidkV2VkxUeTVYem0zUEhtdElnCksxZzRDbnNwTWl3T004ZGpZNE02MmdUeDFrK0JRbC9XM0JBR25mRkpXMjFFVFNxazU4WGtIZForck4zVjVuQWcKRGhzdDU1MzVyTm5lb1h3TExLNStiY3Y2K2dDcTNMbWhWQU50QW9HQkFKZ291UHJmcElaVmUzS0U2bkViSFFmNwpaOGtXK25OemM3NHMrWm83Ympuc0o5UlV5amVzUmVJQlFKZitkejVsN2lCUjFpOGRUTTU1dGZCcXdmVzArSm1tCkdGSG1UTVdwUjd2YzN4WXVEbG1wNXNQckdBU1BKSkx3bmRTaGkvcTNqR1JWZU1RbkptUjMvU011ZG1FL2F6U2cKenk4WGZ5K25QTnFtdXFVazJGV0cKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQ==
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-html-config
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Susel server</title>
+      </head>
+      <body style="background-color:#EE0F6A;">
+        <h1>Task №4</h1>
+        <h2><a href="https://susel.ddns.net/secondpage">1. Test k8s</a></h2>
+        <h2><a href="https://susel.ddns.net/music/carry_on_wayward_son.mp3"> 2. Download music</a></h2>
+        <h2><a href="https://susel.ddns.net/info.php">3. Info php</a></h2>
+        <h2><a href="https://google.com" target="_blank">4. Google</a></h2>
+        <h2><a href="https://susel.ddns.net/files/ansible.yaml" target="_blank">5. YAML file</a></h2>
+        <h2><a href="https://susel.ddns.net/files/first.png" target="_blank">6. PNG</a></h2>
+        <h2><a href="https://susel.ddns.net/files/second.jpg" target="_blank">7. JPG</a></h2>
+        <h2><a href="https://susel.ddns.net/stat/cpu.html" target="_blank">8. Cpu usage</a></h2>
+      </body>
+    </html>
+
