@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: susel-nginx-deployment #name for deployment
+  labels:
+    app: nginx
+#================deployment=======================
+spec: #for depoyment
+  replicas: 1 #how many replicas we wanna create
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+#================pods=======================
+    spec: #for pods
+      containers:
+      - name: nginx
+        image: nginx:latest
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 80
+
+---
+#================service=======================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  labels:
+    env: prod
+    owner: DenisAnanev
+spec:
+  selector:
+    app: nginx
+  ports:
+  - name: nginx-listener
+    protocol: TCP
+    port: 80
+    targetPort: 80
+    nodePort: 30004
+    # By default and for convenience, the Kubernetes control plane
+    # will allocate a port from a range (default: 30000-32767)
+  type: NodePort
