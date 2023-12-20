@@ -1,0 +1,22 @@
+  # start of the kindconfigmap.yaml
+    ## info: the "production-public-ips" can be found 
+    ## within the annotations-sector of the kind: Service type: loadbalancer / the kindservicetypeloadbalancer.yaml 
+    ## as well... ...namespace: metallb-system & protocol: layer2 
+    ## note: as you can see, I added a /32 after every of my node-IPs
+    ##kubectl -n metallb-system apply -f ipaddress-pool-1.yaml 
+    ##kubectl -n metallb-system get IPAddressPool
+    ##NAME         AUTO ASSIGN   AVOID BUGGY IPS   ADDRESSES
+    ##first-pool   true          false             ["157.230.109.25/32","159.223.25.32/32","167.71.43.27/32"]
+    
+
+ 
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  namespace: metallb-system
+  name: first-pool
+spec:
+  addresses:
+    - 157.230.109.25/32
+    - 159.223.25.32/32
+    - 167.71.43.27/32

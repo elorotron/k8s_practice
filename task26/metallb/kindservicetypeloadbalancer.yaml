@@ -1,0 +1,17 @@
+### start of the kindservicetypeloadbalancer.yaml
+### for ensuring a unique name: loadbalancer name nginxloady
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginxloady
+  annotations:
+    metallb.universe.tf/address-pool: production-public-ips
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
