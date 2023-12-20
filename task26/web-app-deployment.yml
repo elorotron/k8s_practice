@@ -69,6 +69,27 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "128m"
+        # readinessProbe:
+        #   httpGet:
+        #     scheme: HTTP
+        #     path: /
+        #     port: 8090
+        #   initialDelaySeconds: 5 #Determines how long to wait after the container starts before beginning the probe.
+        #   periodSeconds: 5 #Specifies the frequency of the checks.
+        # livenessProbe:
+        #   httpGet:
+        #     scheme: HTTP
+        #     path: index.html
+        #     port: 8090
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+        # startupProbe:
+        #   httpGet:
+        #     scheme: HTTP
+        #     path: /
+        #     port: 8090
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
         ports:
         - containerPort: 8090
       volumes:
