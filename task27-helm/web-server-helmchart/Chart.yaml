@@ -1,0 +1,26 @@
+apiVersion: v2
+name: Webserver
+version: 3.13.3
+# kubeVersion: A SemVer range of compatible Kubernetes versions (optional)
+# description: A single-sentence description of this project (optional)
+type: application
+sources:
+  - https://helm.sh/
+  - https://kubernetes.io/
+# dependencies: # A list of the chart requirements (optional)
+#   - name: The name of the chart (nginx)
+#     version: The version of the chart ("1.2.3")
+#     repository: (optional) The repository URL ("https://example.com/charts") or alias ("@repo-name")
+#     condition: (optional) A yaml path that resolves to a boolean, used for enabling/disabling charts (e.g. subchart1.enabled )
+#     tags: # (optional)
+#       - Tags can be used to group charts for enabling/disabling together
+#     import-values: # (optional)
+#       - ImportValues holds the mapping of source values to parent key to be imported. Each item can be a string or pair of child/parent sublist items.
+#     alias: (optional) Alias to be used for the chart. Useful when you have to add the same chart multiple times
+maintainers: # (optional)
+  - name: Denis Ananev
+    email: example@example.com
+    url: susel.ddns.net
+icon: https://w7.pngwing.com/pngs/690/442/png-transparent-pepe-the-frog-pol-internet-meme-others-vertebrate-grass-meme.png
+appVersion: "1.0"
+#deprecated: Whether this chart is deprecated (optional, boolean)

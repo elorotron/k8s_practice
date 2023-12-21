@@ -1,0 +1,16 @@
+#Default values
+
+replicaCount:
+  deployment: 1
+
+container:
+  nginx: suselstar/nginx:1.0
+  apache: suselstar/apache:1.0
+
+limits:
+  nginx:
+    cpu: "128m"
+    memory: "128Mi"
+  apache:
+    cpu: "128m"
+    memory: "128Mi"

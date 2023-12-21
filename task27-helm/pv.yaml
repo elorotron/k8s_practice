@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pvc-prometheus-migration-prometheus-0
+spec:
+  accessModes:
+  - ReadWriteOnce
+  azureDisk:
+    cachingMode: None
+    diskName: pvc-prometheus-migration-prometheus-0
+    diskURI: /subscriptions/f5125d82-2622-4c50-8d25-3f7ba3e9ac4b/resourceGroups/sample-migration-resource-group/providers/Microsoft.Compute/disks/pvc-prometheus-migration-prometheus-0
+    fsType: ""
+    kind: Managed
+    readOnly: false
+  capacity:
+    storage: 1Gi
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: prometheus
+  volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/name: prometheus
+    prometheus: prometheus-migration-prometheus
+  name: prometheus-prometheus-migration-prometheus-db-prometheus-prometheus-migration-prometheus-0
+  namespace: monitoring
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: prometheus
+  volumeMode: Filesystem
+  volumeName: pvc-prometheus-migration-prometheus-0
