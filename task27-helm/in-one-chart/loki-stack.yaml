@@ -1,0 +1,8 @@
+grafana:
+  enabled: true
+  persistence:
+    enabled: true
+    type: pvc
+    size: 8Gi
+  service:
+    type: LoadBalancer

@@ -1,0 +1,1 @@
+# helm upgrade --install --create-namespace --values loki-stack.yaml monitoring-stack -n loki grafana/loki-stack
