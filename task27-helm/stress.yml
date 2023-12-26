@@ -1,20 +1,29 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Pod
 metadata:
-  name: stress
+  name: ubuntu
+  labels:
+    name: ubuntu
 spec:
-  replicas: 50
-  selector:
-    matchLabels:
-      app: stress
-  template:
-    metadata:
-      labels:
-        app: stress
-    spec:
-      containers:
-      - name: stress
-        image: tomcat:latest
-        resources:
-        ports:
-        - containerPort: 9922
+  containers:
+  - name: ubuntu
+    image: ubuntu:22.04
+    # resources:
+    #   limits:
+    #     cpu: 500m
+    #     memory: 512Mi
+    #   requests:
+    #     cpu: 500m
+    #     memory: 512Mi
+    args:
+    - /bin/bash
+    - -c
+    - |
+      apt-get update
+      apt-get install stress
+      apt-get install memtester
+      apt-get install curl
+      while true; do
+        curl localhost
+      done
+  restartPolicy: Always
