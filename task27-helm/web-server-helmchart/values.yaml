@@ -9,8 +9,8 @@ container:
 
 limits:
   nginx:
-    cpu: "128m"
-    memory: "128Mi"
+    cpu: "90m"
+    memory: "100Mi"
   apache:
-    cpu: "128m"
-    memory: "128Mi"
+    cpu: "90m"
+    memory: "100Mi"
