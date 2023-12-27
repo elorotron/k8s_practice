@@ -454,7 +454,7 @@ server:
 
     ## Prometheus server data Persistent Volume size
     ##
-    size: 8Gi
+    size: 7Gi
 
     ## Prometheus server data Persistent Volume Storage Class
     ## If defined, storageClassName: <storageClass>
@@ -592,13 +592,13 @@ server:
   ## Prometheus server resource requests and limits
   ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
   ##
-  resources: {}
-    # limits:
-    #   cpu: 500m
-    #   memory: 512Mi
-    # requests:
-    #   cpu: 500m
-    #   memory: 512Mi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 500m
+      memory: 512Mi
 
   # Required for use in managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico),
   # because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working
@@ -746,6 +746,7 @@ serverFiles:
         static_configs:
           - targets:
             - localhost:9090
+
 
       # A scrape configuration for running Prometheus on a Kubernetes cluster.
       # This uses separate scrape configs for cluster components (i.e. API server, node)
