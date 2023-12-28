@@ -22,7 +22,13 @@ spec:
       target:
         type: Utilization
         averageUtilization: 50
-
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 20
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 15
 ---
 
 apiVersion: apps/v1
