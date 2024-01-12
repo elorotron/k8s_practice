@@ -1,0 +1,236 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-deployment #name for deployment
+  labels:
+    app: {{ .Release.Name }}-deployment #label for deployment
+spec:
+  replicas: {{ .Values.replicaCount.deployment }}
+  selector:
+    matchLabels:
+      project: {{ .Release.Name }}-susel #all pods that have this label are connecting to the deployment
+  template:
+    metadata:
+      labels:
+        project: {{ .Release.Name }}-susel #Service will look for those PODS Labels
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: {{ .Release.Name }}-nginx #name for container
+        image: {{ .Values.container.nginx }}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: {{ .Values.limits.nginx.memory }}
+            cpu: {{ .Values.limits.nginx.cpu }}
+        readinessProbe:
+          httpGet:
+            scheme: HTTP
+            path: /
+            port: 8081
+          initialDelaySeconds: 5 #Determines how long to wait after the container starts before beginning the probe.
+          periodSeconds: 5 #Specifies the frequency of the checks.
+        livenessProbe:
+          httpGet:
+            scheme: HTTP
+            path: index.html
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        startupProbe:
+          httpGet:
+            scheme: HTTP
+            path: /
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+        ports:
+        - name: port80
+          containerPort: 80
+        - name: port443
+          containerPort: 443
+        volumeMounts:
+          - name: configs-for-nginx
+            mountPath: /etc/nginx/conf.d/default.conf
+            subPath: default.conf
+          - name: configs-for-nginx
+            mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+          - name: ssl-certs
+            mountPath: /etc/ssl/certs
+          - name: html
+            mountPath: /var/www/html/index.html
+            subPath: index.html
+          - name: htpasswd-volume
+            mountPath: /etc/nginx/.htpasswd
+            subPath: .htpasswd
+          #   readOnly: true
+          # - name: htpasswd
+          #   mountPath: "/mountdir"
+
+      - name: {{ .Release.Name }}-apache #name for container
+        image: {{ .Values.container.apache }}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: {{ .Values.limits.apache.memory }}
+            cpu: {{ .Values.limits.apache.cpu }}
+        # readinessProbe:
+        #   httpGet:
+        #     scheme: HTTP
+        #     path: /
+        #     port: 8090
+        #   initialDelaySeconds: 5 #Determines how long to wait after the container starts before beginning the probe.
+        #   periodSeconds: 5 #Specifies the frequency of the checks.
+        # livenessProbe:
+        #   httpGet:
+        #     scheme: HTTP
+        #     path: index.html
+        #     port: 8090
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+        # startupProbe:
+        #   httpGet:
+        #     scheme: HTTP
+        #     path: /
+        #     port: 8090
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+        ports:
+        - containerPort: 8090
+      volumes:
+        - name: configs-for-nginx
+          secret:
+            secretName: {{ .Release.Name }}-nginx-configs
+        - name: ssl-certs
+          secret:
+            secretName: {{ .Release.Name }}-nginx-ssl-secret
+        - name: html
+          configMap:
+            name: {{ .Release.Name }}-nginx-html-config
+        - name: htpasswd-volume
+          secret:
+            secretName: htpasswd-secret
+        # - name: htpasswd
+        #   hostPath:
+        #     path: /home/ubuntu/.htpasswd
+        #     type: File
+        # - name: htpasswd
+        #   persistentVolumeClaim:
+        #     claimName: config-volume-pvc
+---
+#==============SERVICE=====================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-nginx-apache-service
+  labels:
+    env: prod
+    owner: DenisAnanev
+spec:
+  selector:
+    project: {{ .Release.Name }}-susel # Selecting PODS with those Labels
+  ports:
+    - name: {{ .Release.Name }}-http
+      protocol: TCP
+      port: 80 #Port on LoadBalancer
+      targetPort: 80 #Port on POD
+
+    - name: {{ .Release.Name }}-https
+      protocol: TCP
+      port: 443 #Port on LoadBalancer
+      targetPort: 443 #Port on POD
+  type: LoadBalancer
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-nginx-ssl-secret
+type: Opaque
+data:
+  fullchain1.pem: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUU2RENDQTlDZ0F3SUJBZ0lTQkZjWnh6cWhSSWU5d1hSR3BVWGZKNVc5TUEwR0NTcUdTSWIzRFFFQkN3VUEKTURJeEN6QUpCZ05WQkFZVEFsVlRNUll3RkFZRFZRUUtFdzFNWlhRbmN5QkZibU55ZVhCME1Rc3dDUVlEVlFRRApFd0pTTXpBZUZ3MHlNekV4TURVeE5EVTFORGxhRncweU5EQXlNRE14TkRVMU5EaGFNQmt4RnpBVkJnTlZCQU1UCkRuTjFjMlZzTG1Sa2JuTXVibVYwTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUEKbk1zbjc5d0dZUWRldmVhelZaMVB5em91eTJGNE41ekdHemFvQUZKZENWWURObUhwVCsyclhkRzYrL0xUdHN5WgpYK2lqRHVaQ3JEeTQ4ZC9XOHZBNjNXYnBvRURPaHZ2OUlPRDc4bE0xOFAwcnN3ZllaSkIwOVZoUjBIK3orZjZTCmdaUGdOYVVwczd1YzNyYnFkc0tBWmpuWDgzZ1FUT0VZYnhGZTBWakFydjhYSGRSL2hJUjlkRW1HMXkrRXlMU2gKdDNOdEhMcHFLSmdXeE1tYTdkTkpWK2dadGhoS2J6VjFsSUlSY0xiYkRZLy9vUjhLWFNJT3FvbXovRjRKbjJGUApPd0F5KzBmeVRhVWhYZ3NRbUNMTU1DMW5nalV5ZmE1d3UyOVFocURuTS9oaGtTMDhrd1k1S1VwdlQ0dnYyZE9rCnBFK1BHSjhRRU9qMzBtN3p4TTVtMndJREFRQUJvNElDRHpDQ0Fnc3dEZ1lEVlIwUEFRSC9CQVFEQWdXZ01CMEcKQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBTUJnTlZIUk1CQWY4RUFqQUFNQjBHQTFVZApEZ1FXQkJTbmlyYjd1NUY4UEhFUkdNbyt1SnVVQnJhdzlqQWZCZ05WSFNNRUdEQVdnQlFVTHJNWHQxaFd5NjVRCkNVRG1INitkaXhUQ3hqQlZCZ2dyQmdFRkJRY0JBUVJKTUVjd0lRWUlLd1lCQlFVSE1BR0dGV2gwZEhBNkx5OXkKTXk1dkxteGxibU55TG05eVp6QWlCZ2dyQmdFRkJRY3dBb1lXYUhSMGNEb3ZMM0l6TG1rdWJHVnVZM0l1YjNKbgpMekFaQmdOVkhSRUVFakFRZ2c1emRYTmxiQzVrWkc1ekxtNWxkREFUQmdOVkhTQUVEREFLTUFnR0JtZUJEQUVDCkFUQ0NBUU1HQ2lzR0FRUUIxbmtDQkFJRWdmUUVnZkVBN3dCMkFFaXc0MnZhcGtjMEQrVnFBdnFkTU9zY1VnSEwKVnQwc2dkbTd2NnM1MklSekFBQUJpNkF5amRRQUFBUURBRWN3UlFJZ1liMEQ0NHhSb1F2SWVOYS82YXZRaVQ5UwprUEhYM0JUTlV6NUgvSFIxanJFQ0lRQ2VpdGJ2cXhuendRL2tHRVFWL25MVVRyMWx2dndNeFNOb1lQR0dxUHR0CmpRQjFBRHRUZDNVK0xibUFUb3N3V3diK1FEdG4yRS9EOU1lOUFBMHRjbS9oK3RRWEFBQUJpNkF5amVZQUFBUUQKQUVZd1JBSWdFUEt1L1gzalVzMjJ2eXB3d2I1QnovcmVOWGlYdEl3YUt0ZFE2RnhSK0NJQ0lFeCtydktkcEVHdgorTW1FREtNTUpId3hiMjVtR3A1L3VDRktCMkFhZGNKYk1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQmJDbG1XCmJHbDdoNS9XdktMRG5VdEtRUENSM1laR3R1cDEwa2dORXZZR3VOWW94WHMwUCtBbnEyL1BuNUE1Z1NPSzB2UUQKL3dQanZoVjBHRGVVUFBnLzJaRWIwbUk0UCsyY3I5Z3FCZXU0VmRqMkRyNU5KMFFVSFJsOHhicEs3dGVQcGR4VgordEFMd29mbXM1WVdCYno2OGIxcGVjMkxFekVHSUVKaDV0cVNmSlJsOTc4cHBrbjFDRDNONWhnSXFZY0xQL1g0CmtxbEtUMFI4SCtsc042bUtIbms4cGxJZFdWQUtHQzJqbG9YYzJGQ1F4VGdZUEI0bVpBdEMxcTlRNDJzUXFnSUsKSFF2alZGa3ZsSGhad0hIZ2RiTi9qK095TFQvMDBKenlyb1ArTEliS2NIVTZlM1E5TjdCQ2l4bjRTSXIyR1J5SQpaSHhMUW9vQVVVb2ljZVNTCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0KLS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZGakNDQXY2Z0F3SUJBZ0lSQUpFckNFclBEQmluVS9iV0xpV25YMW93RFFZSktvWklodmNOQVFFTEJRQXcKVHpFTE1Ba0dBMVVFQmhNQ1ZWTXhLVEFuQmdOVkJBb1RJRWx1ZEdWeWJtVjBJRk5sWTNWeWFYUjVJRkpsYzJWaApjbU5vSUVkeWIzVndNUlV3RXdZRFZRUURFd3hKVTFKSElGSnZiM1FnV0RFd0hoY05NakF3T1RBME1EQXdNREF3CldoY05NalV3T1RFMU1UWXdNREF3V2pBeU1Rc3dDUVlEVlFRR0V3SlZVekVXTUJRR0ExVUVDaE1OVEdWMEozTWcKUlc1amNubHdkREVMTUFrR0ExVUVBeE1DVWpNd2dnRWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUJEd0F3Z2dFSwpBb0lCQVFDN0FoVW96UGFnbE5NUEV1eU5WWkxEK0lMeG1hWjZRb2luWFNhcXRTdTV4VXl4cjQ1citYWElvOWNQClI1UVVWVFZYako2b29qa1o5WUk4UXFsT2J2VTd3eTdiamNDd1hQTlpPT2Z0ejJud1dnc2J2c0NVSkNXSCtqZHgKc3hQbkhLemhtKy9iNUR0RlVrV1dxY0ZUempUSVV1NjFydTJQM21CdzRxVlVxN1p0RHBlbFFEUnJLOU84WnV0bQpOSHo2YTR1UFZ5bVorREFYWGJweWIvdUJ4YTNTaGxnOUY4Zm5DYnZ4Sy9lRzNNSGFjVjNVUnVQTXJTWEJpTHhnClozVm1zL0VZOTZKYzVsUC9Pb2kyUjZYL0V4anFtQWwzUDUxVCtjOEI1ZldtY0JjVXIyT2svNW16azUzY1U2Y0cKL2tpRkhhRnByaVYxdXhQTVVnUDE3VkdoaTlzVkFnTUJBQUdqZ2dFSU1JSUJCREFPQmdOVkhROEJBZjhFQkFNQwpBWVl3SFFZRFZSMGxCQll3RkFZSUt3WUJCUVVIQXdJR0NDc0dBUVVGQndNQk1CSUdBMVVkRXdFQi93UUlNQVlCCkFmOENBUUF3SFFZRFZSME9CQllFRkJRdXN4ZTNXRmJMcmxBSlFPWWZyNTJMRk1MR01COEdBMVVkSXdRWU1CYUEKRkhtMFdlWjd0dVhrQVhPQUNJaklHbGoyNlp0dU1ESUdDQ3NHQVFVRkJ3RUJCQ1l3SkRBaUJnZ3JCZ0VGQlFjdwpBb1lXYUhSMGNEb3ZMM2d4TG1rdWJHVnVZM0l1YjNKbkx6QW5CZ05WSFI4RUlEQWVNQnlnR3FBWWhoWm9kSFJ3Ck9pOHZlREV1WXk1c1pXNWpjaTV2Y21jdk1DSUdBMVVkSUFRYk1Ca3dDQVlHWjRFTUFRSUJNQTBHQ3lzR0FRUUIKZ3Q4VEFRRUJNQTBHQ1NxR1NJYjNEUUVCQ3dVQUE0SUNBUUNGeWs1SFBxUDNoVVNGdk5WbmVMS1lZNjExVFI2VwpQVE5sY2xRdGdhRHF3KzM0SUw5ZnpMZHdBTGR1Ty9aZWxON2tJSittNzR1eUErZWl0Ulk4a2M2MDdUa0M1M3dsCmlrZm1aVzQvUnZUWjhNNlVLKzVVemhLOGpDZEx1TUdZTDZLdnpYR1JTZ2kzeUxnamV3UXRDUGtJVno2RDJRUXoKQ2tjaGVBbUNKOE1xeUp1NXpsenlaTWpBdm5uQVQ0NXRSQXhla3JzdTk0c1E0ZWdkUkNuYldTRHRZN2toK0JJbQpsSk5Yb0IxbEJNRUtJcTRRRFVPWG9SZ2ZmdURnaGplMVdyRzlNTCtIYmlzcS95Rk9Hd1hEOVJpWDhGNnN3Nlc0CmF2QXV2RHN6dWU1TDNzejg1SytFQzRZL3dGVkROdlpvNFRZWGFvNlowZitsUUtjMHQ4RFFZemsxT1hWdThycDIKeUpNQzZhbExiQmZPREFMWnZZSDduN2RvMUFabHM0STlkMVA0am5rRHJRb3hCM1VxUTloVmwzTEVLUTczeEYxTwp5SzVHaEREWDhvVmZHS0Y1dStkZWNJc0g0WWFUdzdtUDNHRnhKU3F2MyswbFVGSm9pNUxjNWRhMTQ5cDkwSWRzCmhDRXhyb0wxKzdtcnlJa1hQZUZNNVRnTzlyMHJ2WmFCRk92VjJ6MGdwMzVaMCtMNFdQbGJ1RWpOL2x4UEZpbisKSGxVanI4Z1JzSTNxZkpPUUZ5LzlyS0lKUjBZLzhPbXd0LzhvVFdneTFtZGVIbW1qazdqMW5Zc3ZDOUpTUTZadgpNbGRsVFRLQjN6aFRoVjErWFdZcDZyamQ1SlcxemJWV0VrTE54RTdHSlRoRVVHM3N6Z0JWR1A3cFNXVFVUc3FYCm5MUmJ3SE9vcTdoSHdnPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQotLS0tLUJFR0lOIENFUlRJRklDQVRFLS0tLS0KTUlJRllEQ0NCRWlnQXdJQkFnSVFRQUYzSVRmVTZVSzQ3bmFxUEdRS3R6QU5CZ2txaGtpRzl3MEJBUXNGQURBLwpNU1F3SWdZRFZRUUtFeHRFYVdkcGRHRnNJRk5wWjI1aGRIVnlaU0JVY25WemRDQkRieTR4RnpBVkJnTlZCQU1UCkRrUlRWQ0JTYjI5MElFTkJJRmd6TUI0WERUSXhNREV5TURFNU1UUXdNMW9YRFRJME1Ea3pNREU0TVRRd00xb3cKVHpFTE1Ba0dBMVVFQmhNQ1ZWTXhLVEFuQmdOVkJBb1RJRWx1ZEdWeWJtVjBJRk5sWTNWeWFYUjVJRkpsYzJWaApjbU5vSUVkeWIzVndNUlV3RXdZRFZRUURFd3hKVTFKSElGSnZiM1FnV0RFd2dnSWlNQTBHQ1NxR1NJYjNEUUVCCkFRVUFBNElDRHdBd2dnSUtBb0lDQVFDdDZDUno5QlEzODV1ZUsxY29ISWUrM0xmZk9KQ01ianptVjZCNDkzWEMKb3Y3MWFtNzJBRThvMjk1b2hteEVrN2F4WS8wVUVtdS9IOUxxTVpzaGZ0RXpQTHBJOWQxNTM3TzQveEx4SVpwTAp3WXFHY1dsS1ptWnNqMzQ4Y0wrdEtTSUc4K1RBNW9DdTRrdVB0NWwrbEFPZjAwZVhmSmxJSTFQb09LNVBDbStECkx0RkpWNHlBZExiYUw5QTRqWHNEY0NFYmRmSXdQUHFQcnQzYVk2dnJGay9DamhGTGZzOEw2UCsxZHk3MHNudEsKNEV3U0pReHdqUU1wb09GVEpPd1QyZTRadnhDelNvdy9pYU5oVWQ2c2h3ZVU5R054N0M3aWIxdVlnZUdKWERSNQpiSGJ2TzVCaWVlYmJwSm92SnNYUUVPRU8zdGtRamhiN3QvZW85OGZsQWdlWWp6WUlsZWZpTjVZTk5uV2UrdzV5CnNSMmJ2QVA1U1FYWWdkMEZ0Q3JXUWVtc0FYYVZDZy9ZMzlXOUVoODFMeWdYYk5LWXdhZ0paSGR1UnplNnpxeFoKWG1pZGYzTFdpY1VHUVNrK1dUN2RKdlVreVJHbldxTk1RQjlHb1ptMXB6cFJib1k3bm4xeXB4SUZlRm50UGxGNApGUXNEajQzUUx3V3lQbnRLSEV0ekJSTDh4dXJnVUJOOFE1TjBzOHAwNTQ0ZkFRalFNTlJiY1RhMEI3ckJNREJjClNMZUNPNWltZldDS29xTXBnc3k2dllNRUc2S0RBMEdoMWdYeEc4SzI4S2g4aGp0R3FFZ3FpTngybW5hL0gycWwKUFJtUDZ6anpaTjdJS3cwS0tQLzMyK0lWUXRRaTBDZGQ0WG4rR09kd2lLMU81dG1MT3NiZEoxRnUvN3hrOVRORApUd0lEQVFBQm80SUJSakNDQVVJd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBT0JnTlZIUThCQWY4RUJBTUNBUVl3ClN3WUlLd1lCQlFVSEFRRUVQekE5TURzR0NDc0dBUVVGQnpBQ2hpOW9kSFJ3T2k4dllYQndjeTVwWkdWdWRISjEKYzNRdVkyOXRMM0p2YjNSekwyUnpkSEp2YjNSallYZ3pMbkEzWXpBZkJnTlZIU01FR0RBV2dCVEVwN0drZXl4eAordHZoUzVCMS84UVZZSVdKRURCVUJnTlZIU0FFVFRCTE1BZ0dCbWVCREFFQ0FUQS9CZ3NyQmdFRUFZTGZFd0VCCkFUQXdNQzRHQ0NzR0FRVUZCd0lCRmlKb2RIUndPaTh2WTNCekxuSnZiM1F0ZURFdWJHVjBjMlZ1WTNKNWNIUXUKYjNKbk1Ed0dBMVVkSHdRMU1ETXdNYUF2b0MyR0syaDBkSEE2THk5amNtd3VhV1JsYm5SeWRYTjBMbU52YlM5RQpVMVJTVDA5VVEwRllNME5TVEM1amNtd3dIUVlEVlIwT0JCWUVGSG0wV2VaN3R1WGtBWE9BQ0lqSUdsajI2WnR1Ck1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQUtjd0JzbG03L0RsTFFydDJNNTFvR3JTK280NCsveVFvREZWREMKNVd4Q3UyK2I5TFJQd2tTSUNIWE02d2ViRkdKdWVON3NKN281WFBXaW9XNVdsSEFRVTdHNzVLL1Fvc01yQWRTVwo5TVVnTlRQNTJHRTI0SEdOdExpMXFvSkZsY0R5cVNNbzU5YWh5MmNJMnFCRExLb2JreC9KM3ZXcmFWMFQ5VnVHCldDTEtUVlhrY0dkdHdsZkZSamxCejRwWWcxaHRtZjVYNkRZTzhBNGpxdjJJbDlEalhBNlVTYlcxRnpYU0xyOU8KaGU4WTRJV1M2d1k3YkNrakNXRGNSUUpNRWhnNzZmc08zdHhFK0ZpWXJ1cTlSVVdoaUYxbXl2NFE2VytDeUJGQwpEZnZwN09PR0FONmRFT000K3FSOXNkam9TWUtFQnBzcjZHdFBBUXc0ZHk3NTNlYzUKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  privkey1.pem: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUV1d0lCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktVd2dnU2hBZ0VBQW9JQkFRQ2N5eWZ2M0FaaEIxNjkKNXJOVm5VL0xPaTdMWVhnM25NWWJOcWdBVWwwSlZnTTJZZWxQN2F0ZDBicjc4dE8yekpsZjZLTU81a0tzUExqeAozOWJ5OERyZFp1bWdRTTZHKy8wZzRQdnlVelh3L1N1ekI5aGtrSFQxV0ZIUWY3UDUvcEtCaytBMXBTbXp1NXplCnR1cDJ3b0JtT2RmemVCQk00Umh2RVY3UldNQ3UveGNkMUgrRWhIMTBTWWJYTDRUSXRLRzNjMjBjdW1vb21CYkUKeVpydDAwbFg2Qm0yR0Vwdk5YV1VnaEZ3dHRzTmovK2hId3BkSWc2cWliUDhYZ21mWVU4N0FETDdSL0pOcFNGZQpDeENZSXN3d0xXZUNOVEo5cm5DN2IxQ0dvT2N6K0dHUkxUeVRCamtwU205UGkrL1owNlNrVDQ4WW54QVE2UGZTCmJ2UEV6bWJiQWdNQkFBRUNnZjhrY1JOWExFeFBRT2RFTzlweWk1MkFIb1hCdjJXeGh6NkVGSy8zWXkwOGZrRkEKNG9EWGt1WEJhSDJORVdNam1Xb01ZSVdGY1A4T0NRN3pLSk5NNDRqSzdLQmdIcS9ocjYrbGRLVWFMVHpjUmZ0aQpJUENxYnVqQUhVYm1yc2VsMHdVNkdLU0QwMTlkNXIwUEJuUjRKYnl5QmIrclZyeHpJZDRMOG4yWEtvbWVJazUvCjhmUDh2Q1NldjFJa0NWN3pHeUJ1ODdRUTZsaW1QazlKNjkzYlFjcGIrd3Jrby9zL3E5ZEo0MjNncWkyRnNjTysKMi83UDYrVXFpMTFCdkdYT1I5RktUcElQbFJwVXdrNVVOVlordWlpc2l6SzVaakhlcmppRXhBSFh1K0FlaXNhdgo5aEd3VEl1Y2R6L2p4STZpZFVlZWMwV3N5Nm1xYmZKWi9jUkIyZmtDZ1lFQTBrTXk3cDMvanYxWVQ2endXNHA5CkRKYitxb2xIOHAzcE03amxJaTJnd2dTUTI5MzI0Tk0xaHlZdzA3ZmRqY2pRL3E1Um5pQVJGQzlPYW90Y2dtT1YKT2xKcDZjRHRXQ1A5NVEyVm1zREJGWGw4Z0libXptZWtVam1lOUtQVFFlWGtyZWZTWmlCVEJndnhKdGpleEpPVwpESGhMcjhQMWR0eDdTZXcvUHVZVDlja0NnWUVBdnVaMGw2VXNLMUxYcDRNUHlIN2F2L3VMMWR3VU1FVjArcEp0CmU5dWh3dzk4UER4enN6cUpPZVhORTdRa1c0WFZidXZRc0ZjOVF6OUJuQXQzTHRvNVErNkJYMDgxVTRzTjZBbG4KMWNYa1IwWDBKRGNmYVdIZXREMElMajVGTFhkT1BGcmphajE4YVVoVGJhZ1VxSGVuWCtoV0ZybDYrQWJhNk96bwpOT0JmR1lNQ2dZQWI4T3dpdzRKRGVTMDBJVklyaUFMSUdvU3JHdVVodTVSUzJENHl4WWQ0WU96ekd0TUUyMnhnCmtsV292T1ZIUXlscXZyVi80dGtDS3Fzc0Eycit0TWNPNGdiTEZtVXo4a3g2Rk0wTnJKRzhEZEhhcnBLYldUQi8KOE1KTDFqMXJvMlk1S2ZaT3RmcnljY0hSSEw2MXRyc1kyeCtMc3VtNnF1QURXYzZweUI5YzZRS0JnQXpWaFlVawpiNkhDQWdtYkFCYWtvS1JEanhVanBKL1NLNWtrK3dOV3NydGdjU1BEbEt1NkJidkV2VkxUeTVYem0zUEhtdElnCksxZzRDbnNwTWl3T004ZGpZNE02MmdUeDFrK0JRbC9XM0JBR25mRkpXMjFFVFNxazU4WGtIZForck4zVjVuQWcKRGhzdDU1MzVyTm5lb1h3TExLNStiY3Y2K2dDcTNMbWhWQU50QW9HQkFKZ291UHJmcElaVmUzS0U2bkViSFFmNwpaOGtXK25OemM3NHMrWm83Ympuc0o5UlV5amVzUmVJQlFKZitkejVsN2lCUjFpOGRUTTU1dGZCcXdmVzArSm1tCkdGSG1UTVdwUjd2YzN4WXVEbG1wNXNQckdBU1BKSkx3bmRTaGkvcTNqR1JWZU1RbkptUjMvU011ZG1FL2F6U2cKenk4WGZ5K25QTnFtdXFVazJGV0cKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQ==
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-nginx-configs
+type: Opaque
+data:
+  default.conf: bG9nX2Zvcm1hdCB1cHN0cmVhbWxvZyAnJHNlcnZlcl9uYW1lIHRvOiAkdXBzdHJlYW1fYWRkciBbJHJlcXVlc3RdICcKICAndXBzdHJlYW1fcmVzcG9uc2VfdGltZSAkdXBzdHJlYW1fcmVzcG9uc2VfdGltZSAnCiAgJ21zZWMgJG1zZWMgcmVxdWVzdF90aW1lICRyZXF1ZXN0X3RpbWUnOwoKCnVwc3RyZWFtIG5vdGVzIHsKIHNlcnZlciBsb2NhbGhvc3Q6ODA4MTsKIHNlcnZlciBsb2NhbGhvc3Q6ODA4NTsKfQoKI2xvYWRfbW9kdWxlIG1vZHVsZXMvbmd4X2h0dHBfaW1hZ2VfZmlsdGVyX21vZHVsZS5zbzsKIz09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQpzZXJ2ZXIgewogICAgc2VydmVyX25hbWUgc3VzZWwuZGRucy5uZXQ7CiAgICBhY2Nlc3NfbG9nIC92YXIvbG9nL25naW54L2FjY2Vzcy5sb2cgdXBzdHJlYW1sb2c7CgogICAgbG9jYXRpb24gLyB7CiAgICAgICAgcHJveHlfcGFzcyBodHRwOi8vbm90ZXM7CiAgICAgICAgcHJveHlfc2V0X2hlYWRlciBIb3N0ICRob3N0OwogICAgICAgIHByb3h5X3NldF9oZWFkZXIgWC1SZWFsLUlQICRyZW1vdGVfYWRkcjsKICAgICAgICBwcm94eV9zZXRfaGVhZGVyIFgtRm9yd2FyZGVkLUZvciAkcHJveHlfYWRkX3hfZm9yd2FyZGVkX2ZvcjsKICAgICAgICBwcm94eV9zZXRfaGVhZGVyIFgtRm9yd2FyZGVkLVByb3RvICRzY2hlbWU7CiAgICAgICAgYXV0aF9iYXNpYyAiUmVzdHJpY3RlZCBDb250ZW50IjsKICAgICAgICBhdXRoX2Jhc2ljX3VzZXJfZmlsZSAvZXRjL25naW54Ly5odHBhc3N3ZDsKICAgIH0KCiAgICBsb2NhdGlvbiAvc2Vjb25kcGFnZS8gewogICAgICAgIHByb3h5X3Bhc3MgaHR0cDovL25vdGVzOwogICAgfQoKICAgIGxvY2F0aW9uIC9tdXNpYyB7CiAgICAgICAgcHJveHlfcGFzcyBodHRwOi8vbm90ZXM7CiAgICB9CgoKICAgIGxvY2F0aW9uIC9pbmZvLnBocCB7CiAgICAgICAgIHByb3h5X3Bhc3MgaHR0cDovL2xvY2FsaG9zdDo4MDkwLzsKCiAgICB9CgojLS0tLS0tLS0tUmVndWxhciBleHByZXNzaW9uLS0tLS0tLS0tLS0KCiAgICBsb2NhdGlvbiB+IF4vZmlsZS8uKlwuKGpwZ3xwbmcpJCB7Cglwcm94eV9wYXNzIGh0dHA6Ly9ub3RlczsKICAgIH0KCiMtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAgICAjWUFNTCBGSUxFCiAgICBsb2NhdGlvbiAvZmlsZXMvYW5zaWJsZS55YW1sIHsKICAgICAgICBwcm94eV9wYXNzIGh0dHA6Ly9ub3RlczsKICAgIH0KCiMtLS0tLS0tLS0tLS0tLS0tQ1BVIHVzYWdlLS0tLS0tLS0tLS0tLQoKICAgIGxvY2F0aW9uIC9zdGF0IHsKICAgICAgICBwcm94eV9wYXNzIGh0dHA6Ly9ub3RlczsKCSNhZGRfaGVhZGVyIFJlZnJlc2ggIjUiOwogICAgfQoKIy0tLS0tLS0tLS0tRXJyb3JzLS0tLS0tLS0tLS0tLS0tLS0KCiAgICBsb2NhdGlvbiAvZXJyb3IgewoJcHJveHlfcGFzcyBodHRwOi8vbm90ZXM7CgkKICAgIH0KCiM9PT09PT09PT09PT09PVNTTCBhbmQgcmVkaXJlY3Q9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CgogICAgbGlzdGVuIDQ0MyBzc2w7CiAgICBzc2xfY2VydGlmaWNhdGUgL2V0Yy9zc2wvY2VydHMvZnVsbGNoYWluMS5wZW07CiAgICBzc2xfY2VydGlmaWNhdGVfa2V5IC9ldGMvc3NsL2NlcnRzL3ByaXZrZXkxLnBlbTsKCn0KCgoKCnNlcnZlciB7CiAgICBpZiAoJGhvc3QgPSBzdXNlbC5kZG5zLm5ldCkgewogICAgICAgIHJldHVybiAzMDEgaHR0cHM6Ly8kaG9zdCRyZXF1ZXN0X3VyaTsKICAgIH0KCgogICAgbGlzdGVuIDgwOwogICAgc2VydmVyX25hbWUgc3VzZWwuZGRucy5uZXQ7CiAgICByZXR1cm4gNDA0OwoKCn0KCiM9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKc2VydmVyIHsKCiM9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQogICAgc2VydmVyX25hbWUgbG9jYWxob3N0OwogICAgCiAgICBsaXN0ZW4gWzo6XTo4MDgxOwogICAgbGlzdGVuIDgwODE7CiAgICAKICAgIHJvb3QgL3Zhci93d3cvaHRtbDsKICAgIGluZGV4IGluZGV4Lmh0bWwgaW5kZXgucGhwIGluZm8ucGhwOwogICAgCiM9PT09PT09TG9jYXRpb24gYmxvY2s9PT09PT09PT09PT09PT09PT0KCiAgICBsb2NhdGlvbiAvIHsKICAgICAgICB0cnlfZmlsZXMgJHVyaSAkdXJpLyA9NDA0OwogICAgfQoKICAgIGxvY2F0aW9uIC9zZWNvbmRwYWdlLyB7CiAgICAgICAgYWxpYXMgL3Zhci93d3cvaHRtbC9zZWNvbmRwYWdlLzsKICAgICAgICBpbmRleCBpbmRleC5odG1sOwogICAgICAgIHRyeV9maWxlcyAkdXJpICR1cmkvID00MDQ7CiAgICB9CgogICAgbG9jYXRpb24gL211c2ljIHsKICAgICAgICBhbGlhcyAvdmFyL3d3dy9odG1sL211c2ljOwogICAgICAgIGFkZF9oZWFkZXIgQ29udGVudC1EaXNwb3NpdGlvbiAnYXR0YWNobWVudDsgZmlsZW5hbWU9ImNhcnJ5X29uX3dheXdhcmRfc29uLm1wMyInOwogICAgfQoKIy0tLS0tLS0tLS0tLS0tPVJlZ3VsYXIgZXhwcmVzc29pbi0tLS0tLS0tLS0tLS0KCiAgICBsb2NhdGlvbiB+KiBeL2ZpbGVzLyguKlwucG5nKSQgewogICAgICAgIHJvb3QgL3Zhci93d3cvaHRtbDsKCXR5cGVzIHsKCSAgaW1hZ2UvcG5nIHBuZzsKCX0KICAgIH0KCiMtLS0tLS0tLS0tcmVnZXggd2l0aCByb3RhdGUtLS0tLS0tLS0tLS0tLS0tLS0tCgogICAgIGxvY2F0aW9uIH4qIF4vZmlsZXMvKC4qXC5qcGcpJCB7CiAgICAgICAgcm9vdCAvdmFyL3d3dy9odG1sLzsKICAgICAgICBpbWFnZV9maWx0ZXIgcm90YXRlIDE4MDsKICAgICAgICB0eXBlcyB7CiAgICAgICAgICBpbWFnZS9qcGVnIGpwZzsKICAgICAgICB9CiAgICAgfQoKIy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KCiAgICAgbG9jYXRpb24gL2ZpbGVzL2Fuc2libGUueWFtbCB7CiAgICAgICAgYWxpYXMgL3Zhci93d3cvaHRtbC9maWxlcy9hbnNpYmxlLnlhbWw7CiAgICAgICAgZGVmYXVsdF90eXBlIHRleHQvcGxhaW47CiAgICAgfQoKCiMtLS0tLS0tLS0tLS0tLS0tLWNwdSBzdGF0LS0tLS0tLS0tLS0tLS0tLS0tLS0KCgogICAgbG9jYXRpb24gL3N0YXQgewogICAgICAgIGFsaWFzIC92YXIvd3d3L2h0bWwvc3RhdC87CiAgICAgICAgaW5kZXggY3B1Lmh0bWw7CiAgICAgICAgdHJ5X2ZpbGVzICR1cmkgJHVyaS8gPTQwNDsKCWFkZF9oZWFkZXIgUmVmcmVzaCAiNSI7CiAgICB9CgojLS0tLS0tLS0tLWVycm9ycy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQoKICAgIGxvY2F0aW9uIC9lcnJvciB7CiAgICAgICAgICByZXR1cm4gNTAwICJFcnJvciB0ZXN0IjsKICAgICAgICB9CgoKCn0KIz09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKc2VydmVyIHsKCiM9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQogICAgc2VydmVyX25hbWUgbG9jYWxob3N0OwogICAgCiAgICBsaXN0ZW4gWzo6XTo4MDg1OwogICAgbGlzdGVuIDgwODU7CiAgICAKICAgIHJvb3QgL3Zhci93d3cvaHRtbDsKICAgIGluZGV4IGluZGV4Mi5odG1sIGluZGV4LnBocCBpbmZvLnBocDsKICAgIAojPT09PT09PUxvY2F0aW9uIGJsb2NrPT09PT09PT09PT09PT09PT09CgogICAgbG9jYXRpb24gLyB7CiAgICAgICAgdHJ5X2ZpbGVzICR1cmkgJHVyaS8gPTQwNDsKICAgIH0KCiAgICBsb2NhdGlvbiAvc2Vjb25kcGFnZS8gewogICAgICAgIGFsaWFzIC92YXIvd3d3L2h0bWwvc2Vjb25kcGFnZS87CiAgICAgICAgaW5kZXggaW5kZXguaHRtbDsKICAgICAgICB0cnlfZmlsZXMgJHVyaSAkdXJpLyA9NDA0OwogICAgfQoKICAgIGxvY2F0aW9uIC9tdXNpYyB7CiAgICAgICAgYWxpYXMgL3Zhci93d3cvaHRtbC9tdXNpYzsKICAgICAgICBhZGRfaGVhZGVyIENvbnRlbnQtRGlzcG9zaXRpb24gJ2F0dGFjaG1lbnQ7IGZpbGVuYW1lPSJjYXJyeV9vbl93YXl3YXJkX3Nvbi5tcDMiJzsKICAgIH0KCiMtLS0tLS0tLS0tLS0tLT1SZWd1bGFyIGV4cHJlc3NvaW4tLS0tLS0tLS0tLS0tCgogICAgbG9jYXRpb24gfiogXi9maWxlcy8oLipcLnBuZykkIHsKICAgICAgICByb290IC92YXIvd3d3L2h0bWw7Cgl0eXBlcyB7CgkgIGltYWdlL3BuZyBwbmc7Cgl9CiAgICB9CgojLS0tLS0tLS0tLXJlZ2V4IHdpdGggcm90YXRlLS0tLS0tLS0tLS0tLS0tLS0tLQoKICAgICBsb2NhdGlvbiB+KiBeL2ZpbGVzLyguKlwuanBnKSQgewogICAgICAgIHJvb3QgL3Zhci93d3cvaHRtbC87CiAgICAgICAgaW1hZ2VfZmlsdGVyIHJvdGF0ZSAxODA7CiAgICAgICAgdHlwZXMgewogICAgICAgICAgaW1hZ2UvanBlZyBqcGc7CiAgICAgICAgfQogICAgfQoKIy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KCiAgICBsb2NhdGlvbiAvZmlsZXMvYW5zaWJsZS55YW1sIHsKICAgICAgICBhbGlhcyAvdmFyL3d3dy9odG1sL2ZpbGVzL2Fuc2libGUueWFtbDsKICAgICAgICBkZWZhdWx0X3R5cGUgdGV4dC9wbGFpbjsKICAgIH0KCiMtLS0tLS0tLS0tQ1BVIFVTQUdFLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KCiAgICBsb2NhdGlvbiAvc3RhdCB7CiAgICAgICAgYWxpYXMgL3Zhci93d3cvaHRtbC9zdGF0LzsKICAgICAgICBpbmRleCBjcHUuaHRtbDsKICAgICAgICB0cnlfZmlsZXMgJHVyaSAkdXJpLyA9NDA0OwoJYWRkX2hlYWRlciBSZWZyZXNoICI1IjsKICAgIH0KCiMtLS0tLS0tLS0tLS0tLWVycm9ycy0tLS0tLS0tLS0tLS0tCgogICAgbG9jYXRpb24gL2Vycm9yIHsKICAgICAgICAgIHJldHVybiA1MDAgIkVycm9yIHRlc3QiOwogICAgICAgIH0KCgoKfQoKIz09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQ==
+  nginx.conf: dXNlciAgbmdpbng7Cndvcmtlcl9wcm9jZXNzZXMgIGF1dG87CgplcnJvcl9sb2cgIC92YXIvbG9nL25naW54L2Vycm9yLmxvZyBub3RpY2U7CnBpZCAgICAgICAgL3Zhci9ydW4vbmdpbngucGlkOwoKbG9hZF9tb2R1bGUgbW9kdWxlcy9uZ3hfaHR0cF9pbWFnZV9maWx0ZXJfbW9kdWxlLnNvOwpldmVudHMgewogICAgd29ya2VyX2Nvbm5lY3Rpb25zICAxMDI0Owp9CgoKaHR0cCB7CiAgICBpbmNsdWRlICAgICAgIC9ldGMvbmdpbngvbWltZS50eXBlczsKICAgIGRlZmF1bHRfdHlwZSAgYXBwbGljYXRpb24vb2N0ZXQtc3RyZWFtOwoKICAgIGxvZ19mb3JtYXQgIG1haW4gICckcmVtb3RlX2FkZHIgLSAkcmVtb3RlX3VzZXIgWyR0aW1lX2xvY2FsXSAiJHJlcXVlc3QiICcKICAgICAgICAgICAgICAgICAgICAgICckc3RhdHVzICRib2R5X2J5dGVzX3NlbnQgIiRodHRwX3JlZmVyZXIiICcKICAgICAgICAgICAgICAgICAgICAgICciJGh0dHBfdXNlcl9hZ2VudCIgIiRodHRwX3hfZm9yd2FyZGVkX2ZvciInOwoKICAgIGFjY2Vzc19sb2cgIC92YXIvbG9nL25naW54L2FjY2Vzcy5sb2cgIG1haW47CgogICAgc2VuZGZpbGUgICAgICAgIG9uOwogICAgI3RjcF9ub3B1c2ggICAgIG9uOwoKICAgIGtlZXBhbGl2ZV90aW1lb3V0ICA2NTsKCiAgICAjZ3ppcCAgb247CgogICAgaW5jbHVkZSAvZXRjL25naW54L2NvbmYuZC8qLmNvbmY7Cn0=
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-nginx-html-config
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Susel server</title>
+      </head>
+      <body style="background-color:#EE0F6A;">
+        <h1>Task №4</h1>
+        <h2><a href="https://susel.ddns.net/secondpage">1. Second page</a></h2>
+        <h2><a href="https://susel.ddns.net/music/carry_on_wayward_son.mp3"> 2. Download music</a></h2>
+        <h2><a href="https://susel.ddns.net/info.php">3. Info php</a></h2>
+        <h2><a href="https://google.com" target="_blank">4. Google</a></h2>
+        <h2><a href="https://susel.ddns.net/files/ansible.yaml" target="_blank">5. YAML file</a></h2>
+        <h2><a href="https://susel.ddns.net/files/first.png" target="_blank">6. PNG</a></h2>
+        <h2><a href="https://susel.ddns.net/files/second.jpg" target="_blank">7. JPG</a></h2>
+        <h2><a href="https://susel.ddns.net/stat/cpu.html" target="_blank">8. Cpu usage</a></h2>
+      </body>
+    </html>
+
+# ---
+
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: {{ .Release.Name }}-htpasswd
+# type: Opaque
+# data:
+#   .htpasswd: $(echo -n "`aws ssm get-parameter --name webserver_passwd --with-decrypt --region=eu-central-1 --output text --query Parameter.Value`" | base64)
+#   .htpasswd: $webserver_passwd
+
+# ---
+
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: config-volume-pv
+#   labels:
+#     type: local
+# spec:
+#   capacity:
+#     storage: 100Mi
+#   accessModes:
+#     - ReadWriteOnce
+#   storageClassName: manual
+#   hostPath:
+#     path: "/home/ubuntu/passwd"
+
+# ---
+
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: config-volume-pvc
+# spec:
+#   storageClassName: manual
+#   accessModes:
+#   - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 100Mi
+

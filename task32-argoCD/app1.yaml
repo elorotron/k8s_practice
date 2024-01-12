@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name     : webserver
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name     : in-cluster                                       # K8s part
+    namespace: webserver                                        #
+  source:                                                       # Git part
+    path   : "HelmCharts/web-server-helmchart"                  #
+    repoURL: "git@github.com:elorotron/k8s_helmcharts.git"      #
+    targetRevision: HEAD                                        #
+    helm:                                                        
+      valueFiles:
+      - values.yaml
+      # parameters:
+      # - name: "replicaCount.deployment"
+      #   value: "1"
+      # - name: "container.nginx"
+      #   value: "suselstar/nginx:1.0"
+      # - name: "container.apache"
+      #   value: "suselstar/apache:1.0"
+      # - name: "limits.nginx.cpu"
+      #   value: "90m"
+      # - name: "limits.nginx.memory"
+      #   value: "100Mi"
+      # - name: "limits.apache.cpu"
+      #   value: "90m"
+      # - name: "limits.apache.memory"
+      #   value: "100Mi"
+
+  project: default
+  syncPolicy:
+    automated:
+      prune   : true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true   
