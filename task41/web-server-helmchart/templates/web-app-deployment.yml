@@ -112,13 +112,7 @@ spec:
         - name: htpasswd-volume
           secret:
             secretName: htpasswd-secret
-        # - name: htpasswd
-        #   hostPath:
-        #     path: /home/ubuntu/.htpasswd
-        #     type: File
-        # - name: htpasswd
-        #   persistentVolumeClaim:
-        #     claimName: config-volume-pvc
+
 ---
 #==============SERVICE=====================
 apiVersion: v1
@@ -153,6 +147,8 @@ metadata:
     name: myingress
   annotations:
     cert-manager.io/issuer: "letsencrypt-prod"
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    cert-manager.io/issue-temporary-certificate: "true"
 spec:
   ingressClassName: nginx
   rules:
@@ -160,7 +156,7 @@ spec:
     http:
       paths:
       - pathType: Prefix
-        path: "/"
+        path: /
         backend:
           service:
             name: {{ .Release.Name }}-nginx-apache-service
@@ -170,8 +166,7 @@ spec:
   tls:
   - hosts:
     - susel.ddns.net
-    # - susel-apache.ddns.net
-    secretName: letsencrypt-prod-priv
+    secretName: letsencrypt-prod-private #name for tls private secret
 
 # ---
 

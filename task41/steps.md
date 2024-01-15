@@ -1,30 +1,44 @@
-# kubectl create secret generic htpasswd-secret --from-file="path_to_.htpasswd"
+# Create secret for auntification
+### kubectl create secret generic htpasswd-secret --from-file=.htpasswd
 
 # TLS
-# for self-signet certificate
-# openssl req -x509 -nodes -days 9999 -newkey rsa:2048 -keyout certs/ingress-tls.key -out certs/ingress-tls.crt
-# kubectl create secret tls ingress-cert --namespace dev --key=certs/ingress-tls.key --cert=certs/ingress-tls.crt -o yaml
+### for self-signet certificate
+### openssl req -x509 -nodes -days 9999 -newkey rsa:2048 -keyout certs/ingress-tls.key -out certs/ingress-tls.crt
+### kubectl create secret tls ingress-cert --namespace dev --key=certs/ingress-tls.key --cert=certs/ingress-tls.crt -o yaml
 
-# install ingress-nginx
+# Install ingress-nginx
+### helm install my-release oci://ghcr.io/nginxinc/charts/nginx-ingress --version 1.1.0
+### kubectl get po -n ingress-nginx
+## Edit nginx-ingress deployment
+### kubectl edit deploy <ingress-deployment>
+### set - -enable-tls-passthrough=true
+###     - -enable-cert-manager=true
 
-# helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-# helm repo update
+# Attach Domain to the external ip of nginx load balancer
+#### kubectl get svc -n ingress-nginx
 
-# helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-#  --namespace ingress-nginx \
-#  --create-namespace \
-#  --timeout 600s \
-#  --debug \
-#  --set controller.publishService.enabled=true
+#### install cert manager
+### helm repo add jetstack https://charts.jetstack.io
+### helm repo update
+### helm upgrade --install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --atomic \
+  --version v1.13.3 \
+  --set installCRDs=true
+### kubectl get po -n cert-manager
 
-# install cert manager
+# Install issuer
+### kubectl apply -f issuer.yaml
+### kubectl get issuer
 
-# helm repo add jetstack https://charts.jetstack.io
-# helm repo update
+# Deploy webserver helmchart
+### helm install web web-server-helmchart/
+### kubectl get po
 
-# helm upgrade --install cert-manager jetstack/cert-manager \
-#  --namespace cert-manager \
-#  --create-namespace \
-#  --atomic \
-#  --version v1.13.3 \
-#  --set installCRDs=true
+# Troubleshoot commands
+### kubectl get issuer
+### kubectl get certificate
+### kubectl get certificaterequest
+### kubectl get order
+### kubectl get challenge
