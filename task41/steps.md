@@ -17,7 +17,7 @@
 # Attach Domain to the external ip of nginx load balancer
 #### kubectl get svc -n ingress-nginx
 
-#### install cert manager
+# install cert manager
 ### helm repo add jetstack https://charts.jetstack.io
 ### helm repo update
 ### helm upgrade --install cert-manager jetstack/cert-manager \
